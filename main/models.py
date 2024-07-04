@@ -1,6 +1,7 @@
 from django.db import models
 from django.db.models import Value
 from django.db.models.functions import Concat
+
 from .virtual import VirtualModel
 
 
@@ -21,9 +22,6 @@ class Book(models.Model):
 class Thing(VirtualModel):
     isolated_attributes = ['id', 'title', 'object_type']
 
-    def __str__(self):
-        return f"<Thing \"{self.title}\" />"
-
     @classmethod
     def get_querysets(cls):
         return [
@@ -33,3 +31,6 @@ class Thing(VirtualModel):
             ),
             Book.objects.annotate(object_type=models.Value('BOOK')),
         ]
+
+    def __str__(self):
+        return f"<Thing \"{self.title}\" />"

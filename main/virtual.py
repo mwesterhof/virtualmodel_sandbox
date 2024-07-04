@@ -4,18 +4,13 @@ from django.db.models.functions import Concat
 from django.utils.functional import cached_property
 
 
-class ThingIterable(models.query.BaseIterable):
+class VirtualModelIterable(models.query.BaseIterable):
     def __iter__(self):
-        from .models import Thing  # TODO
-
         for obj in self.queryset:
-            if isinstance(obj, Thing):
-                yield Thing
-            else:
-                yield Thing(**obj)
+            yield obj
 
 
-class ThingQuerySet(models.QuerySet):
+class VirtualModelQuerySet(models.QuerySet):
     def __init__(self, model=None, query=None, using=None, hints=None, deferred_querysets=None):
         self.model = model
         self._db = using
@@ -27,17 +22,15 @@ class ThingQuerySet(models.QuerySet):
         self._prefetch_related_lookups = ()
         self._prefetch_done = False
         self._known_related_objects = {}  # {rel_field: {pk: rel_obj}}
-        self._iterable_class = ThingIterable
+        self._iterable_class = VirtualModelIterable
         self._fields = None
         self._defer_next_filter = False
         self._deferred_filter = None
         self._deferred_querysets = deferred_querysets
 
     def __iter__(self):
-        from .models import Thing  # TODO
-
         for obj in self._get_joined_qs():
-            yield Thing(**obj)
+            yield self.model(**obj)
 
     def _get_joined_qs(self):
         # TODO: apply filter to individual querysets as they are joined
@@ -74,13 +67,14 @@ class ThingQuerySet(models.QuerySet):
 
 
 
-class ThingManager(models.Manager):
-    def get_queryset(self):
-        from .models import Book, Person, Thing  # TODO
+class VirtualModelManager(models.Manager):
+    def register_virtual_model(self, model):
+        self.model = model
 
-        return ThingQuerySet(
-            model=Thing,
-            deferred_querysets=Thing.get_querysets(),
+    def get_queryset(self):
+        return VirtualModelQuerySet(
+            model=self.model,
+            deferred_querysets=self.model.get_querysets(),
         )
 
     # def get_queryset(self):
@@ -100,15 +94,26 @@ class VirtualModelMeta:
     def __init__(self, model):
         self.app_label = 'main'
         self.model = model
-        self.model_name = 'Thing'
+        self.model_name = 'VirtualModel'
         self.fields = []
 
 
-class VirtualModel:
+class VirtualModelBase(type):
+    def __new__(cls, *args, **kwargs):
+        klass = super().__new__(cls, *args, **kwargs)
+
+        manager = klass.objects
+        manager.register_virtual_model(klass)
+        klass.objects = klass._default_manager = manager
+
+        return klass
+
+
+class VirtualModel(metaclass=VirtualModelBase):
     isolated_attributes = ['id']
 
     _meta = VirtualModelMeta(None)
-    objects = _default_manager = ThingManager()
+    objects = _default_manager = VirtualModelManager()
 
     def __init__(self, **kwargs):
         for attrib_name in self.isolated_attributes:
