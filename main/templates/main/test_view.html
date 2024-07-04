@@ -1,0 +1,16 @@
+<html>
+    <head>
+        <title>thing list</title>
+    </head>
+    <body>
+        <h1>thing list</h1>
+
+        <ul>
+            {% for obj in object_list %}
+            <li>
+                <a href="{% url "thing_detail" obj.id %}">{{ obj.title }}</a>
+            </li>
+            {% endfor %}
+        </ul>
+    </body>
+</html>
