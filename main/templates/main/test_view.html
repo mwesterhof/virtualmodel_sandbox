@@ -8,7 +8,7 @@
         <ul>
             {% for obj in object_list %}
             <li>
-                <a href="{% url "thing_detail" obj.id %}">{{ obj.title }}</a>
+                <a href="{% url "thing_detail" obj.id %}">{{ obj.title }} ({{ obj.object_type }})</a>
             </li>
             {% endfor %}
         </ul>
