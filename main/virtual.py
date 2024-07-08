@@ -1,6 +1,6 @@
 from django.db import models
 from django.db.models import Q, sql
-from django.db.models.functions import Concat
+from django.db.models.functions import Cast, Concat
 from django.utils.functional import cached_property
 
 
@@ -32,12 +32,32 @@ class VirtualModelQuerySet(models.QuerySet):
         for obj in self._get_joined_qs():
             yield self.model(**obj)
 
+    def _annotate_merged_id(self, qs, i):
+        isolated_attributes = list(self.model.isolated_attributes)
+
+        return qs.annotate(
+            _qs_id=models.Value(str(i)),
+            _str_id=Cast('id', output_field=models.CharField())
+        ).annotate(
+            _merged_id=Concat('_qs_id', models.Value('_'), '_str_id')
+        ).values(
+            *(isolated_attributes + ['_merged_id']),
+        ).annotate(
+            id=models.F('_merged_id'),
+            pk=models.F('_merged_id'),
+        ).values(*isolated_attributes + ['id', 'pk'])
+
     def _get_joined_qs(self):
         # TODO: apply filter to individual querysets as they are joined
 
-        base_qs = self._deferred_querysets[0].values(*self.model.isolated_attributes)
-        for other in self._deferred_querysets[1:]:
-            base_qs = base_qs.union(other.values(*self.model.isolated_attributes))
+        base_qs = self._annotate_merged_id(
+            self._deferred_querysets[0], 1
+        )
+
+        for i, other in enumerate(self._deferred_querysets[1:], start=2):
+            base_qs = base_qs.union(
+                self._annotate_merged_id(other, i)
+            )
 
         return base_qs
 
@@ -116,7 +136,7 @@ class VirtualModel(metaclass=VirtualModelBase):
     objects = _default_manager = VirtualModelManager()
 
     def __init__(self, **kwargs):
-        for attrib_name in self.isolated_attributes:
+        for attrib_name in self.isolated_attributes + ['id', 'pk']:
             setattr(self, attrib_name, kwargs[attrib_name])
 
     def __repr__(self):

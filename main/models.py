@@ -19,8 +19,8 @@ class Book(models.Model):
     )
 
 
-class Thing(VirtualModel):
-    isolated_attributes = ['id', 'title', 'object_type']
+class PrintableThing(VirtualModel):
+    isolated_attributes = ['title', 'object_type']
 
     @classmethod
     def get_querysets(cls):
@@ -33,4 +33,4 @@ class Thing(VirtualModel):
         ]
 
     def __str__(self):
-        return f"<Thing \"{self.title}\" />"
+        return f"<PrintableThing \"{self.title}\" />"
